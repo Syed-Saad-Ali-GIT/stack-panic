@@ -33,7 +33,7 @@ func _get_utc_yyyymmdd() -> int:
 	# Godot date dict API availability can vary slightly between editor/export setups.
 	# Using system datetime is the most compatible approach for a deterministic daily seed.
 	var dt := Time.get_datetime_dict_from_system()
-	return int(dt["year"]) * 10000 + int(dt["month"]) * 100 + int(dt["day"])
+	return int(dt['year']) * 10000 + int(dt['month']) * 100 + int(dt['day'])
 
 func _is_tap_on_daily_label(event: InputEvent) -> bool:
 	if event is InputEventScreenTouch:
