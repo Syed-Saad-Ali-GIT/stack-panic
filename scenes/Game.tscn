@@ -35,10 +35,6 @@ var death_count: int = 0
 var blocks_placed: int = 0
 var bg_tween: Tween
 var camera_tween: Tween
-var daily_mode: bool = false
-var daily_seed: int = 0
-var daily_rng: RandomNumberGenerator = RandomNumberGenerator.new()
-var next_block_index: int = 0
 var vp_size: Vector2
 
 func _ready() -> void:
@@ -63,13 +59,6 @@ func _start_game() -> void:
 	combo_active = false
 	combo_blocks_remaining = 0
 	blocks_placed = 0
-	# Daily Challenge (local/date-seeded): direction + speed come from a deterministic sequence.
-	daily_mode = SaveManager.daily_challenge_active
-	daily_seed = SaveManager.daily_seed_yyyymmdd
-	next_block_index = 0
-	if daily_mode:
-		# Seed must be stable across players/runs.
-		daily_rng.seed = daily_seed
 	# Stack starts near the bottom of the screen
 	stack_top_x = vp_size.x / 2.0
 	stack_top_y = vp_size.y * STACK_START_Y_RATIO
@@ -154,8 +143,7 @@ func _place_block() -> void:
 	blocks_placed += 1
 	stack_blocks.append(current_block)
 	current_block = null
-	if not daily_mode:
-		move_right = not move_right
+	move_right = not move_right
 	_update_background()
 	_update_camera()
 	_spawn_next_block()
@@ -165,19 +153,9 @@ func _spawn_next_block() -> void:
 	add_child(block)
 	var spd: float = minf(BASE_SPEED + score * 0.08, MAX_SPEED)
 	var move_dir: bool = move_right
-	if daily_mode:
-		var idx: int = next_block_index
-		# Seeded direction: deterministic left/right sequence for the day.
-		move_dir = daily_rng.randi_range(0, 1) == 1
-		# Seeded speed: must not depend on `score` (perfects would desync players).
-		var speed_base: float = BASE_SPEED + float(idx) * 0.08
-		var speed_multiplier: float = daily_rng.randf_range(0.90, 1.10)
-		spd = minf(speed_base * speed_multiplier, MAX_SPEED)
-		next_block_index += 1
 	var col: Color = ThemeManagerSP.get_block_color(SaveManager.active_theme, score)
 	block.block_locked.connect(_on_block_locked)
 	# Spawn one block height above current stack top
-	move_right = move_dir
 	block.setup(current_width, move_dir, spd, stack_top_y - BLOCK_HEIGHT, col)
 	current_block = block
 	print('Spawned block at y=', stack_top_y - BLOCK_HEIGHT, ' x will start at screen edge, width=', current_width)

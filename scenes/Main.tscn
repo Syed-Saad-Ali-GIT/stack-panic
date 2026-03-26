@@ -7,7 +7,6 @@ extends Node2D
 @onready var background: ColorRect = $Background
 @onready var title_label: Label = $UI/TitleLabel
 @onready var tap_label: Label = $UI/TapLabel
-@onready var daily_label: Label = $UI/DailyTapLabel
 @onready var best_label: Label = $UI/BestLabel
 
 var pulsing: bool = true
@@ -15,42 +14,20 @@ var pulsing: bool = true
 func _ready() -> void:
 	best_label.text = 'BEST: ' + str(SaveManager.high_score)
 	_pulse_tap_label()
-	_pulse_daily_label()
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.pressed:
-		_go_to_game(_is_tap_on_daily_label(event))
+		_go_to_game()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_go_to_game(_is_tap_on_daily_label(event))
+		_go_to_game()
 
-func _go_to_game(is_daily: bool) -> void:
-	SaveManager.daily_challenge_active = is_daily
-	if is_daily:
-		SaveManager.daily_seed_yyyymmdd = _get_utc_yyyymmdd()
+func _go_to_game() -> void:
 	get_tree().change_scene_to_file('res://scenes/Game.tscn')
-
-func _get_utc_yyyymmdd() -> int:
-	# Godot date dict API availability can vary slightly between editor/export setups.
-	# Using system datetime is the most compatible approach for a deterministic daily seed.
-	var dt := Time.get_datetime_dict_from_system()
-	return int(dt['year']) * 10000 + int(dt['month']) * 100 + int(dt['day'])
-
-func _is_tap_on_daily_label(event: InputEvent) -> bool:
-	if event is InputEventScreenTouch:
-		return daily_label.get_global_rect().has_point(event.position)
-	if event is InputEventMouseButton:
-		return daily_label.get_global_rect().has_point(event.position)
-	return false
 
 func _pulse_tap_label() -> void:
 	var tween := create_tween().set_loops()
 	tween.tween_property(tap_label, 'modulate:a', 0.2, 0.7)
 	tween.tween_property(tap_label, 'modulate:a', 1.0, 0.7)
-
-func _pulse_daily_label() -> void:
-	var tween := create_tween().set_loops()
-	tween.tween_property(daily_label, 'modulate:a', 0.2, 0.7)
-	tween.tween_property(daily_label, 'modulate:a', 1.0, 0.7)
 "
 
 [node name="Main" type="Node2D"]
@@ -105,20 +82,6 @@ offset_bottom = 40.0
 theme_override_font_sizes/font_size = 28
 horizontal_alignment = 1
 text = "TAP TO PLAY"
-
-[node name="DailyTapLabel" type="Label" parent="UI"]
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-anchor_top = 0.80
-anchor_bottom = 0.80
-offset_left = -170.0
-offset_right = 170.0
-offset_bottom = 60.0
-theme_override_font_sizes/font_size = 22
-theme_override_colors/font_color = Color(1, 1, 1, 0.7)
-horizontal_alignment = 1
-text = "DAILY CHALLENGE"
 
 [node name="BestLabel" type="Label" parent="UI"]
 anchors_preset = 5

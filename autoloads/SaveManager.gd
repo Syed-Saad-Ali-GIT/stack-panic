@@ -10,10 +10,6 @@ var sfx_enabled: bool = true
 var music_enabled: bool = true
 var ghost_enabled: bool = true
 
-# Daily Challenge (local/date-seeded only; transient runtime state)
-var daily_challenge_active: bool = false
-var daily_seed_yyyymmdd: int = 0
-
 func _ready() -> void:
 	load_data()
 
