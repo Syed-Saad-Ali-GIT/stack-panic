@@ -30,9 +30,9 @@ func _go_to_game(is_daily: bool) -> void:
 	get_tree().change_scene_to_file('res://scenes/Game.tscn')
 
 func _get_utc_yyyymmdd() -> int:
-	var unix_time := Time.get_unix_time_from_system()
-	# Godot's unix_time is UTC-based; derive a stable UTC date int (yyyymmdd).
-	var dt := Time.get_datetime_dict_from_unix_time(unix_time)
+	# Godot date dict API availability can vary slightly between editor/export setups.
+	# Using system datetime is the most compatible approach for a deterministic daily seed.
+	var dt := Time.get_datetime_dict_from_system()
 	return int(dt["year"]) * 10000 + int(dt["month"]) * 100 + int(dt["day"])
 
 func _is_tap_on_daily_label(event: InputEvent) -> bool:
