@@ -56,6 +56,8 @@ func _start_game() -> void:
 	if current_block:
 		current_block.queue_free()
 		current_block = null
+	# Retry should immediately dismiss the overlay.
+	death_screen.hide_death()
 	score = 0
 	perfect_streak = 0
 	combo_active = false
