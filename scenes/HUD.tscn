@@ -1,0 +1,138 @@
+[gd_scene format=3 uid="uid://hud001"]
+
+[sub_resource type="GDScript" id="GDScript_1"]
+script/source = "
+extends CanvasLayer
+
+@onready var score_label: Label = $ScoreLabel
+@onready var high_score_label: Label = $HighScoreLabel
+@onready var combo_badge: Panel = $ComboBadge
+@onready var combo_label: Label = $ComboBadge/ComboLabel
+@onready var perfect_label: Label = $PerfectLabel
+@onready var flash_overlay: ColorRect = $FlashOverlay
+
+var flash_tween: Tween
+
+func _ready() -> void:
+	Events.score_changed.connect(_on_score_changed)
+	Events.block_placed.connect(_on_block_placed)
+	Events.game_started.connect(_on_game_started)
+	combo_badge.visible = false
+	perfect_label.visible = false
+	flash_overlay.visible = false
+	flash_overlay.color = Color(1, 1, 1, 0)
+	high_score_label.text = 'BEST: ' + str(SaveManager.high_score)
+
+func _on_game_started() -> void:
+	score_label.text = '0'
+	combo_badge.visible = false
+	perfect_label.visible = false
+
+func _on_score_changed(new_score: int) -> void:
+	score_label.text = str(new_score)
+
+func _on_block_placed(score: int, is_perfect: bool) -> void:
+	if is_perfect:
+		show_perfect()
+		trigger_flash()
+
+func show_perfect() -> void:
+	perfect_label.visible = true
+	perfect_label.modulate.a = 1.0
+	var tween := create_tween()
+	tween.tween_property(perfect_label, 'position:y', perfect_label.position.y - 30, 0.4)
+	tween.parallel().tween_property(perfect_label, 'modulate:a', 0.0, 0.4)
+	tween.tween_callback(func(): perfect_label.visible = false; perfect_label.position.y += 30)
+
+func trigger_flash() -> void:
+	flash_overlay.visible = true
+	flash_overlay.color = Color(1, 1, 1, 0.6)
+	if flash_tween:
+		flash_tween.kill()
+	flash_tween = create_tween()
+	flash_tween.tween_property(flash_overlay, 'color:a', 0.0, 0.06)
+	flash_tween.tween_callback(func(): flash_overlay.visible = false)
+
+func show_combo(multiplier: int) -> void:
+	combo_badge.visible = true
+	combo_label.text = 'x' + str(multiplier)
+	var tween := create_tween()
+	tween.tween_property(combo_badge, 'scale', Vector2(1.2, 1.2), 0.1)
+	tween.tween_property(combo_badge, 'scale', Vector2(1.0, 1.0), 0.1)
+
+func hide_combo() -> void:
+	combo_badge.visible = false
+
+func update_high_score(score: int) -> void:
+	high_score_label.text = 'BEST: ' + str(score)
+"
+
+[node name="HUD" type="CanvasLayer"]
+script = SubResource("GDScript_1")
+
+[node name="ScoreLabel" type="Label" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 60.0
+offset_right = 100.0
+offset_bottom = 130.0
+theme_override_font_sizes/font_size = 64
+horizontal_alignment = 1
+text = "0"
+
+[node name="HighScoreLabel" type="Label" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 140.0
+offset_right = 100.0
+offset_bottom = 165.0
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+modulate = Color(1, 1, 1, 0.6)
+text = "BEST: 0"
+
+[node name="ComboBadge" type="Panel" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -40.0
+offset_top = 175.0
+offset_right = 40.0
+offset_bottom = 205.0
+visible = false
+
+[node name="ComboLabel" type="Label" parent="ComboBadge"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "x2"
+
+[node name="PerfectLabel" type="Label" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -80.0
+offset_top = 220.0
+offset_right = 80.0
+offset_bottom = 260.0
+theme_override_font_sizes/font_size = 32
+theme_override_colors/font_color = Color(1, 0.9, 0.2, 1)
+horizontal_alignment = 1
+visible = false
+text = "PERFECT!"
+
+[node name="FlashOverlay" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(1, 1, 1, 0)
+visible = false
+mouse_filter = 2

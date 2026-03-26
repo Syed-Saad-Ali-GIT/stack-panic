@@ -1,0 +1,87 @@
+[gd_scene format=3 uid="uid://death001"]
+
+[sub_resource type="GDScript" id="GDScript_1"]
+script/source = "
+extends CanvasLayer
+
+signal retry_pressed
+signal revive_pressed
+
+@onready var score_label: Label = $Panel/VBox/ScoreLabel
+@onready var high_score_label: Label = $Panel/VBox/HighScoreLabel
+@onready var new_best_label: Label = $Panel/VBox/NewBestLabel
+@onready var retry_button: Button = $Panel/VBox/RetryButton
+@onready var revive_button: Button = $Panel/VBox/ReviveButton
+@onready var panel: Panel = $Panel
+
+func _ready() -> void:
+	visible = false
+	retry_button.pressed.connect(func(): retry_pressed.emit())
+	revive_button.pressed.connect(func(): revive_pressed.emit())
+
+func show_death(score: int, is_new_high: bool) -> void:
+	score_label.text = str(score)
+	high_score_label.text = 'BEST: ' + str(SaveManager.high_score)
+	new_best_label.visible = is_new_high
+	visible = true
+	var tween := create_tween()
+	panel.modulate.a = 0.0
+	tween.tween_property(panel, 'modulate:a', 1.0, 0.3)
+
+func hide_death() -> void:
+	visible = false
+"
+
+[node name="DeathScreen" type="CanvasLayer"]
+script = SubResource("GDScript_1")
+visible = false
+
+[node name="Panel" type="Panel" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+modulate = Color(0, 0, 0, 0.85)
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.3
+anchor_bottom = 0.8
+offset_left = -150.0
+offset_right = 150.0
+alignment = 1
+
+[node name="GameOverLabel" type="Label" parent="Panel/VBox"]
+theme_override_font_sizes/font_size = 42
+horizontal_alignment = 1
+text = "GAME OVER"
+
+[node name="ScoreLabel" type="Label" parent="Panel/VBox"]
+theme_override_font_sizes/font_size = 80
+horizontal_alignment = 1
+text = "0"
+
+[node name="HighScoreLabel" type="Label" parent="Panel/VBox"]
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+modulate = Color(1, 1, 1, 0.65)
+text = "BEST: 0"
+
+[node name="NewBestLabel" type="Label" parent="Panel/VBox"]
+theme_override_font_sizes/font_size = 26
+theme_override_colors/font_color = Color(1, 0.85, 0.1, 1)
+horizontal_alignment = 1
+visible = false
+text = "NEW BEST!"
+
+[node name="RetryButton" type="Button" parent="Panel/VBox"]
+custom_minimum_size = Vector2(0, 56)
+theme_override_font_sizes/font_size = 26
+text = "RETRY"
+
+[node name="ReviveButton" type="Button" parent="Panel/VBox"]
+custom_minimum_size = Vector2(0, 48)
+theme_override_font_sizes/font_size = 20
+modulate = Color(1, 1, 1, 0.8)
+text = "Watch Ad to Revive"

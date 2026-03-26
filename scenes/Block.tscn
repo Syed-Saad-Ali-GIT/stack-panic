@@ -1,0 +1,76 @@
+[gd_scene load_steps=2 format=3 uid="uid://block001"]
+
+[sub_resource type="GDScript" id="GDScript_1"]
+script/source = "
+extends Node2D
+
+signal block_locked(x_pos: float, width: float)
+
+const MIN_WIDTH: float = 8.0
+
+@onready var color_rect: ColorRect = $ColorRect
+
+var active: bool = false
+var screen_width: float = 0.0
+var block_width: float = 300.0
+var move_right: bool = true
+var speed: float = 180.0
+
+func _ready() -> void:
+	pass
+
+func setup(p_width: float, p_move_right: bool, p_speed: float, p_y: float, p_color: Color) -> void:
+	screen_width = get_viewport().get_visible_rect().size.x
+	block_width = p_width
+	move_right = p_move_right
+	speed = p_speed
+	position.y = p_y
+	# `position` is the block's center; start just offscreen.
+	position.x = -p_width / 2.0 if p_move_right else screen_width + p_width / 2.0
+	color_rect.size = Vector2(p_width, 40.0)
+	color_rect.position = Vector2(-p_width / 2.0, -20.0)
+	color_rect.color = p_color
+	active = true
+
+func _process(delta: float) -> void:
+	if not active:
+		return
+	var dir: float = 1.0 if move_right else -1.0
+	position.x += dir * speed * delta
+	# Wrap using half-width so the block leaves/enters at the correct edge.
+	if move_right and position.x > screen_width + block_width / 2.0:
+		position.x = -block_width / 2.0
+	elif not move_right and position.x < -block_width / 2.0:
+		position.x = screen_width + block_width / 2.0
+
+func lock() -> void:
+	active = false
+	block_locked.emit(position.x, block_width)
+
+func stop() -> void:
+	# Stop the block without emitting `block_locked`.
+	# Used for game-over/revive so we don't spawn extra blocks.
+	active = false
+
+func set_color(c: Color) -> void:
+	color_rect.color = c
+
+func trim(new_width: float, new_x: float) -> void:
+	block_width = new_width
+	position.x = new_x
+	color_rect.size.x = new_width
+	color_rect.position.x = -new_width / 2.0
+
+func is_too_small() -> bool:
+	return block_width <= MIN_WIDTH
+"
+
+[node name="Block" type="Node2D"]
+script = SubResource("GDScript_1")
+
+[node name="ColorRect" type="ColorRect" parent="."]
+offset_left = -150.0
+offset_top = -20.0
+offset_right = 150.0
+offset_bottom = 20.0
+color = Color(0.29, 0.565, 0.851, 1)

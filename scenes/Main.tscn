@@ -1,0 +1,129 @@
+[gd_scene format=3 uid="uid://main001"]
+
+[sub_resource type="GDScript" id="GDScript_1"]
+script/source = "
+extends Node2D
+
+@onready var background: ColorRect = $Background
+@onready var title_label: Label = $UI/TitleLabel
+@onready var tap_label: Label = $UI/TapLabel
+@onready var daily_label: Label = $UI/DailyTapLabel
+@onready var best_label: Label = $UI/BestLabel
+
+var pulsing: bool = true
+
+func _ready() -> void:
+	best_label.text = 'BEST: ' + str(SaveManager.high_score)
+	_pulse_tap_label()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed:
+		_go_to_game(_is_tap_on_daily_label(event))
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_go_to_game(_is_tap_on_daily_label(event))
+
+func _go_to_game(is_daily: bool) -> void:
+	SaveManager.daily_challenge_active = is_daily
+	if is_daily:
+		SaveManager.daily_seed_yyyymmdd = _get_utc_yyyymmdd()
+	get_tree().change_scene_to_file('res://scenes/Game.tscn')
+
+func _get_utc_yyyymmdd() -> int:
+	var unix_time := Time.get_unix_time_from_system()
+	# Godot's unix_time is UTC-based; derive a stable UTC date int (yyyymmdd).
+	var dt := Time.get_datetime_dict_from_unix_time(unix_time)
+	return int(dt["year"]) * 10000 + int(dt["month"]) * 100 + int(dt["day"])
+
+func _is_tap_on_daily_label(event: InputEvent) -> bool:
+	if event is InputEventScreenTouch:
+		return daily_label.get_global_rect().has_point(event.position)
+	if event is InputEventMouseButton:
+		return daily_label.get_global_rect().has_point(event.position)
+	return false
+
+func _pulse_tap_label() -> void:
+	var tween := create_tween().set_loops()
+	tween.tween_property(tap_label, 'modulate:a', 0.2, 0.7)
+	tween.tween_property(tap_label, 'modulate:a', 1.0, 0.7)
+"
+
+[node name="Main" type="Node2D"]
+script = SubResource("GDScript_1")
+
+[node name="Background" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.102, 0.227, 0.361, 1)
+z_index = -10
+mouse_filter = 2
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="TitleLabel" type="Label" parent="UI"]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.28
+anchor_bottom = 0.28
+offset_left = -200.0
+offset_right = 200.0
+offset_bottom = 80.0
+theme_override_font_sizes/font_size = 64
+horizontal_alignment = 1
+text = "STACK PANIC"
+
+[node name="SubtitleLabel" type="Label" parent="UI"]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.42
+anchor_bottom = 0.42
+offset_left = -150.0
+offset_right = 150.0
+offset_bottom = 30.0
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(1, 1, 1, 0.6)
+horizontal_alignment = 1
+text = "How high can you go?"
+
+[node name="TapLabel" type="Label" parent="UI"]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.72
+anchor_bottom = 0.72
+offset_left = -150.0
+offset_right = 150.0
+offset_bottom = 40.0
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+text = "TAP TO PLAY"
+
+[node name="DailyTapLabel" type="Label" parent="UI"]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.80
+anchor_bottom = 0.80
+offset_left = -170.0
+offset_right = 170.0
+offset_bottom = 60.0
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(1, 1, 1, 0.7)
+horizontal_alignment = 1
+text = "DAILY CHALLENGE"
+
+[node name="BestLabel" type="Label" parent="UI"]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.84
+anchor_bottom = 0.84
+offset_left = -100.0
+offset_right = 100.0
+offset_bottom = 30.0
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(1, 1, 1, 0.5)
+horizontal_alignment = 1
+text = "BEST: 0"

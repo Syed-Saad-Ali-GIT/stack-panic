@@ -1,0 +1,239 @@
+[gd_scene load_steps=3 format=3 uid="uid://game001"]
+
+[ext_resource type="PackedScene" uid="uid://block001" path="res://scenes/Block.tscn" id="1"]
+[ext_resource type="PackedScene" uid="uid://hud001" path="res://scenes/HUD.tscn" id="2"]
+[ext_resource type="PackedScene" uid="uid://death001" path="res://scenes/DeathScreen.tscn" id="3"]
+
+[sub_resource type="GDScript" id="GDScript_1"]
+script/source = "
+extends Node2D
+
+const BLOCK_SCENE = preload('res://scenes/Block.tscn')
+const PERFECT_THRESHOLD: float = 4.0
+const BASE_SPEED: float = 180.0
+const MAX_SPEED: float = 520.0
+const BLOCK_HEIGHT: float = 40.0
+const STACK_START_Y_RATIO: float = 0.7
+
+@onready var background: ColorRect = $Background
+@onready var hud: CanvasLayer = $HUD
+@onready var death_screen: CanvasLayer = $DeathScreen
+@onready var camera: Camera2D = $Camera2D
+
+var score: int = 0
+var current_block: Node2D = null
+var stack_blocks: Array[Node2D] = []
+var current_width: float = 0.0
+var move_right: bool = true
+var stack_top_y: float = 0.0
+var stack_top_x: float = 0.0
+var perfect_streak: int = 0
+var combo_active: bool = false
+var combo_blocks_remaining: int = 0
+var game_active: bool = false
+var death_count: int = 0
+var blocks_placed: int = 0
+var bg_tween: Tween
+var camera_tween: Tween
+var daily_mode: bool = false
+var daily_seed: int = 0
+var daily_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var next_block_index: int = 0
+var vp_size: Vector2
+
+func _ready() -> void:
+	death_screen.retry_pressed.connect(_start_game)
+	death_screen.revive_pressed.connect(_on_revive)
+	vp_size = get_viewport().get_visible_rect().size
+	# Camera starts centred on screen
+	camera.position = Vector2(vp_size.x / 2.0, vp_size.y / 2.0)
+	_start_game()
+
+func _start_game() -> void:
+	for b in stack_blocks:
+		b.queue_free()
+	stack_blocks.clear()
+	if current_block:
+		current_block.queue_free()
+		current_block = null
+	score = 0
+	perfect_streak = 0
+	combo_active = false
+	combo_blocks_remaining = 0
+	blocks_placed = 0
+	# Daily Challenge (local/date-seeded): direction + speed come from a deterministic sequence.
+	daily_mode = SaveManager.daily_challenge_active
+	daily_seed = SaveManager.daily_seed_yyyymmdd
+	next_block_index = 0
+	if daily_mode:
+		# Seed must be stable across players/runs.
+		daily_rng.seed = daily_seed
+	# Stack starts near the bottom of the screen
+	stack_top_x = vp_size.x / 2.0
+	stack_top_y = vp_size.y * STACK_START_Y_RATIO
+	current_width = vp_size.x * 0.85
+	camera.position = Vector2(vp_size.x / 2.0, vp_size.y / 2.0)
+	move_right = true
+	game_active = true
+	Events.game_started.emit()
+	Events.score_changed.emit(0)
+	_update_background()
+	_spawn_next_block()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not game_active:
+		return
+	if event is InputEventScreenTouch and event.pressed:
+		_tap()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_tap()
+
+func _tap() -> void:
+	if current_block == null or not game_active:
+		return
+	current_block.lock()
+
+func _on_block_locked(block_x: float, block_width: float) -> void:
+	if blocks_placed == 0:
+		# First block — place centred, no overlap needed
+		current_block.trim(block_width, stack_top_x)
+		_place_block()
+		return
+
+	var overhang: float = absf(block_x - stack_top_x)
+	if overhang >= block_width:
+		_trigger_game_over()
+		return
+
+	var is_perfect: bool = overhang <= PERFECT_THRESHOLD
+	var final_x: float = stack_top_x
+	var final_width: float = block_width
+
+	if not is_perfect:
+		var new_left: float = block_x - block_width / 2.0
+		var new_right: float = block_x + block_width / 2.0
+		var stack_left: float = stack_top_x - current_width / 2.0
+		var stack_right: float = stack_top_x + current_width / 2.0
+		var overlap_left: float = maxf(new_left, stack_left)
+		var overlap_right: float = minf(new_right, stack_right)
+		final_width = overlap_right - overlap_left
+		final_x = overlap_left + final_width / 2.0
+		if final_width <= 8.0:
+			_trigger_game_over()
+			return
+		current_block.trim(final_width, final_x)
+		perfect_streak = 0
+		if combo_active:
+			combo_blocks_remaining -= 1
+			if combo_blocks_remaining <= 0:
+				combo_active = false
+				hud.hide_combo()
+	else:
+		current_block.trim(block_width, stack_top_x)
+		final_x = stack_top_x
+		perfect_streak += 1
+		if perfect_streak >= 3 and not combo_active:
+			combo_active = true
+			combo_blocks_remaining = 5
+			hud.show_combo(2)
+
+	stack_top_x = final_x
+	current_width = final_width
+	var points: int = 2 if is_perfect else 1
+	if combo_active:
+		points *= 2
+	score += points
+	Events.score_changed.emit(score)
+	Events.block_placed.emit(score, is_perfect)
+	_place_block()
+
+func _place_block() -> void:
+	stack_top_y -= BLOCK_HEIGHT
+	blocks_placed += 1
+	stack_blocks.append(current_block)
+	current_block = null
+	if not daily_mode:
+		move_right = not move_right
+	_update_background()
+	_update_camera()
+	_spawn_next_block()
+
+func _spawn_next_block() -> void:
+	var block: Node2D = BLOCK_SCENE.instantiate()
+	add_child(block)
+	var spd: float = minf(BASE_SPEED + score * 0.08, MAX_SPEED)
+	var move_dir: bool = move_right
+	if daily_mode:
+		var idx: int = next_block_index
+		# Seeded direction: deterministic left/right sequence for the day.
+		move_dir = daily_rng.randi_range(0, 1) == 1
+		# Seeded speed: must not depend on `score` (perfects would desync players).
+		var speed_base: float = BASE_SPEED + float(idx) * 0.08
+		var speed_multiplier: float = daily_rng.randf_range(0.90, 1.10)
+		spd = minf(speed_base * speed_multiplier, MAX_SPEED)
+		next_block_index += 1
+	var col: Color = ThemeManagerSP.get_block_color(SaveManager.active_theme, score)
+	block.block_locked.connect(_on_block_locked)
+	# Spawn one block height above current stack top
+	move_right = move_dir
+	block.setup(current_width, move_dir, spd, stack_top_y - BLOCK_HEIGHT, col)
+	current_block = block
+	print('Spawned block at y=', stack_top_y - BLOCK_HEIGHT, ' x will start at screen edge, width=', current_width)
+
+func _trigger_game_over() -> void:
+	game_active = false
+	# Stop the currently moving block so it doesn't keep animating in the death screen.
+	if current_block:
+		current_block.stop()
+	death_count += 1
+	var is_new_best: bool = SaveManager.check_and_save_high_score(score)
+	if is_new_best:
+		Events.new_high_score.emit(score)
+	Events.game_over.emit(score)
+	death_screen.show_death(score, is_new_best)
+
+func _on_revive() -> void:
+	game_active = true
+	death_screen.hide_death()
+	# Remove the old moving block so we only ever have one active block.
+	if current_block:
+		current_block.queue_free()
+		current_block = null
+	_spawn_next_block()
+
+func _update_camera() -> void:
+	# Camera follows stack upward — keep stack top at ~65% down the screen
+	# With a Camera2D, `position` is the viewport center (not the top edge).
+	# Place the stack top at ~65% of the viewport height.
+	var target_y: float = stack_top_y - vp_size.y * 0.15
+	if camera_tween:
+		camera_tween.kill()
+	camera_tween = create_tween()
+	camera_tween.tween_property(camera, 'position:y', target_y, 0.25)
+
+func _update_background() -> void:
+	var stage: Dictionary = ThemeManagerSP.get_stage(SaveManager.active_theme, score)
+	if bg_tween:
+		bg_tween.kill()
+	bg_tween = create_tween()
+	bg_tween.tween_property(background, 'color', stage['bg_top'], 0.5)
+"
+
+[node name="Game" type="Node2D"]
+script = SubResource("GDScript_1")
+
+[node name="Background" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.102, 0.227, 0.361, 1)
+z_index = -10
+mouse_filter = 2
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, 0)
+current = true
+
+[node name="HUD" parent="." instance=ExtResource("2")]
+
+[node name="DeathScreen" parent="." instance=ExtResource("3")]
