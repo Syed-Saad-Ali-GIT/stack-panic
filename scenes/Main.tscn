@@ -15,8 +15,9 @@ var pulsing: bool = true
 func _ready() -> void:
 	best_label.text = 'BEST: ' + str(SaveManager.high_score)
 	_pulse_tap_label()
+	_pulse_daily_label()
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.pressed:
 		_go_to_game(_is_tap_on_daily_label(event))
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -45,6 +46,11 @@ func _pulse_tap_label() -> void:
 	var tween := create_tween().set_loops()
 	tween.tween_property(tap_label, 'modulate:a', 0.2, 0.7)
 	tween.tween_property(tap_label, 'modulate:a', 1.0, 0.7)
+
+func _pulse_daily_label() -> void:
+	var tween := create_tween().set_loops()
+	tween.tween_property(daily_label, 'modulate:a', 0.2, 0.7)
+	tween.tween_property(daily_label, 'modulate:a', 1.0, 0.7)
 "
 
 [node name="Main" type="Node2D"]
